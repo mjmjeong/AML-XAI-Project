@@ -6,16 +6,17 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
 from utils import DatasetSplit
-
+import copy 
 class LocalUpdate(object):
     def __init__(self, args, dataset, idxs, logger):
         self.args = args
         self.logger = logger
-        self.trainloader, self.validloader, self.testloader = self.train_val_test(
+        self.trainloader, self.validloader, self.testloader, self.fisherloader = self.train_val_test(
             dataset, list(idxs))
         self.device = 'cuda' if args.gpu else 'cpu'
         # Default criterion set to NLL loss function
         self.criterion = nn.NLLLoss().to(self.device)
+        self.ewc_lambda = args.ewc_lambda
 
     def train_val_test(self, dataset, idxs):
         """
@@ -29,14 +30,18 @@ class LocalUpdate(object):
 
         trainloader = DataLoader(DatasetSplit(dataset, idxs_train),
                                  batch_size=self.args.local_bs, shuffle=True)
+        #TODO: check fisher loader
+        fisherloader = DataLoader(DatasetSplit(dataset, idxs_train),
+                                 batch_size=self.args.fisher_bs, shuffle=True)
         validloader = DataLoader(DatasetSplit(dataset, idxs_val),
                                  batch_size=int(len(idxs_val)/10), shuffle=False)
         testloader = DataLoader(DatasetSplit(dataset, idxs_test),
                                 batch_size=int(len(idxs_test)/10), shuffle=False)
-        return trainloader, validloader, testloader
+        return trainloader, validloader, testloader, fisherloader
 
-    def update_weights(self, model, global_round,fisher=None):
+    def update_weights(self, model, fisher, global_round):
         # Set mode to train model
+        fixed_model = copy.deepcopy(model) 
         model.train()
         epoch_loss = []
 
@@ -56,6 +61,14 @@ class LocalUpdate(object):
                 model.zero_grad()
                 log_probs = model(images)
                 loss = self.criterion(log_probs, labels)
+                
+                #EWC loss
+                if not global_round == 0: #TODO first step! -> Not using fisher info
+                    reg_loss = 0 
+                    fixed_params = {n:p for n,p in fixed_model.named_parameters()}
+                    for n, p in model.named_parameters():
+                        reg_loss += ((fisher[n])*((p-fixed_params[n])**2)).sum()
+                    loss += self.ewc_lambda * reg_loss * 0.5
                 loss.backward()
                 optimizer.step()
 
@@ -67,9 +80,52 @@ class LocalUpdate(object):
                 self.logger.add_scalar('loss', loss.item())
                 batch_loss.append(loss.item())
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
-
+        
+        fisher = self.update_fisher(model, fisher)
+        
         return model.state_dict(), fisher, sum(epoch_loss) / len(epoch_loss)
 
+    def compute_diag_fisher(self, model):
+        
+        #Define optimizer
+        if self.args.optimizer == 'sgd':
+            optimizer = torch.optim.SGD(model.parameters(), lr=self.args.lr,
+                                        momentum=0.5)
+        elif self.args.optimizer == 'adam':
+            optimizer = torch.optim.Adam(model.parameters(), lr=self.args.lr,
+                                         weight_decay=1e-4)
+
+        #initialization of fisher info
+        diag_fisher = {}
+        for n, p in model.named_parameters():
+            diag_fisher[n] = p.clone().detach().fill_(0)
+        
+        #diagonal fisher matrix
+        for i, (images, labels) in enumerate(self.fisherloader):
+            optimizer.zero_grad()
+            images, labels = images.to(self.device), labels.to(self.device)
+            log_probs = model(images)
+            #batch_size = images.shape[0]
+            #TODO true label? estimated label?  
+            loss = self.criterion(log_probs, labels)
+            loss.backward()
+            for n, p in model.named_parameters():
+                if p.grad is not None:
+                    diag_fisher[n] += (p.grad.detach()**2 / len(self.fisherloader))
+        return diag_fisher
+    
+    def update_fisher(self, model, fisher=None):
+        diag_fisher = self.compute_diag_fisher(model)
+        if fisher is None:
+            return diag_fisher
+        else:
+            for n, p in model.named_parameters():
+                if self.args.fisher_update_type == 'summation':
+                    fisher[n] += diag_fisher[n]
+                else:
+                    fisher[n] = (1-self.args.gamma)*diag_fisher[n] + self.args.gamma*fisher[n]  #TODO gamma
+            return fisher
+    
     def inference(self, model):
         """ Returns the inference accuracy and loss.
         """

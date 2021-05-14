@@ -61,14 +61,6 @@ class LocalUpdate(object):
                 model.zero_grad()
                 log_probs = model(images)
                 loss = self.criterion(log_probs, labels)
-                
-                #EWC loss
-                if not global_round == 0: #TODO first step! -> Not using fisher info
-                    reg_loss = 0 
-                    fixed_params = {n:p for n,p in fixed_model.named_parameters()}
-                    for n, p in model.named_parameters():
-                        reg_loss += ((fisher[n])*((p-fixed_params[n])**2)).sum()
-                    loss += self.ewc_lambda * reg_loss * 0.5
                 loss.backward()
                 optimizer.step()
 
