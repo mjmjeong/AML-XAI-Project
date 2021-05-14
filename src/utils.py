@@ -7,7 +7,53 @@ import torch
 from torchvision import datasets, transforms
 from sampling import mnist_iid, mnist_noniid, mnist_noniid_unequal
 from sampling import cifar_iid, cifar_noniid
+from torch import nn
+from torch.utils.data import DataLoader, Dataset
 
+
+class DatasetSplit(Dataset):
+    """An abstract Dataset class wrapped around Pytorch Dataset class.
+    """
+
+    def __init__(self, dataset, idxs):
+        self.dataset = dataset
+        self.idxs = [int(i) for i in idxs]
+
+    def __len__(self):
+        return len(self.idxs)
+
+    def __getitem__(self, item):
+        image, label = self.dataset[self.idxs[item]]
+        return torch.tensor(image), torch.tensor(label)
+
+def test_inference(args, model, test_dataset):
+    """ Returns the test accuracy and loss.
+    """
+
+    model.eval()
+    loss, total, correct = 0.0, 0.0, 0.0
+
+    device = 'cuda' if args.gpu else 'cpu'
+    criterion = nn.NLLLoss().to(device)
+    testloader = DataLoader(test_dataset, batch_size=128,
+                            shuffle=False)
+
+    for batch_idx, (images, labels) in enumerate(testloader):
+        images, labels = images.to(device), labels.to(device)
+
+        # Inference
+        outputs = model(images)
+        batch_loss = criterion(outputs, labels)
+        loss += batch_loss.item()
+
+        # Prediction
+        _, pred_labels = torch.max(outputs, 1)
+        pred_labels = pred_labels.view(-1)
+        correct += torch.sum(torch.eq(pred_labels, labels)).item()
+        total += len(labels)
+
+    accuracy = correct/total
+    return accuracy, loss
 
 def get_dataset(args):
     """ Returns train and test datasets and a user group which is a dict where
@@ -70,18 +116,6 @@ def get_dataset(args):
                 user_groups = mnist_noniid(train_dataset, args.num_users)
 
     return train_dataset, test_dataset, user_groups
-
-
-def average_weights(w):
-    """
-    Returns the average of the weights.
-    """
-    w_avg = copy.deepcopy(w[0])
-    for key in w_avg.keys():
-        for i in range(1, len(w)):
-            w_avg[key] += w[i][key]
-        w_avg[key] = torch.div(w_avg[key], len(w))
-    return w_avg
 
 
 def exp_details(args):

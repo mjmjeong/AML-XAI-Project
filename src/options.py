@@ -47,7 +47,7 @@ def args_parser():
                         of dataset")
     parser.add_argument('--num_classes', type=int, default=10, help="number \
                         of classes")
-    parser.add_argument('--gpu', default=None, help="To use cuda, set \
+    parser.add_argument('--gpu', default=None, type=int, help="To use cuda, set \
                         to a specific GPU ID. Default set to use CPU.")
     parser.add_argument('--optimizer', type=str, default='sgd', help="type \
                         of optimizer")
@@ -60,5 +60,13 @@ def args_parser():
                         help='rounds of early stopping')
     parser.add_argument('--verbose', type=int, default=1, help='verbose')
     parser.add_argument('--seed', type=int, default=1, help='random seed')
+    
+    # ablation for CL
+    parser.add_argument('--global_update', type=str, default='avg', help='method for aggregating weights')
+    parser.add_argument('--local_update', type=str, default='base', help='method for local update')
+    parser.add_argument('--ewc_lambda', type=float, default=0.001, help='weight for ewc loss')
+    parser.add_argument('--fisher_gamma', type=float, default=0, help='the weight for remembering the previous fisher matrix, 0: not considering previous fisher info, [0-1]')
+    parser.add_argument('--fisher_update_type', type=str, default='summation', help='sum fisher matrix the weight')
+    parser.add_argument('--fisher_bs', type=int, default=100, help='batch for fisher iterator')
     args = parser.parse_args()
     return args
