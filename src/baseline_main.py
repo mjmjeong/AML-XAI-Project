@@ -14,6 +14,8 @@ from options import args_parser
 from update import test_inference
 from models import MLP, CNNMnist, CNNFashion_Mnist, CNNCifar
 
+import random
+import numpy as np
 
 if __name__ == '__main__':
     args = args_parser()
@@ -21,6 +23,15 @@ if __name__ == '__main__':
         torch.cuda.set_device(args.gpu)
     device = 'cuda' if args.gpu else 'cpu'
 
+    #set seed
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
+    torch.backends.cudnn.deterministic=True
+    torch.backends.cudnn.benchmark=False
+    #TODO cudnn?
+ 
     # load datasets
     train_dataset, test_dataset, _ = get_dataset(args)
 

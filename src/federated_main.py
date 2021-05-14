@@ -18,6 +18,8 @@ from update import LocalUpdate, test_inference
 from models import MLP, CNNMnist, CNNFashion_Mnist, CNNCifar
 from utils import get_dataset, average_weights, exp_details
 
+import random
+import numpy as np
 
 if __name__ == '__main__':
     start_time = time.time()
@@ -34,6 +36,14 @@ if __name__ == '__main__':
     #    torch.cuda.set_device(args.gpu_id)
     device = 'cuda' if args.gpu else 'cpu'
 
+    #set seed
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
+    torch.backends.cudnn.deterministic=True
+    torch.backends.cudnn.benchmark=False
+    #TODO cudnn?
     # load dataset and user groups
     train_dataset, test_dataset, user_groups = get_dataset(args)
 
