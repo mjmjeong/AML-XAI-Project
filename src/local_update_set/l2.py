@@ -67,7 +67,7 @@ class LocalUpdate(object):
                     reg_loss = 0 
                     fixed_params = {n:p for n,p in fixed_model.named_parameters()}
                     for n, p in model.named_parameters():
-                        reg_loss += ((fisher[n])*((p-fixed_params[n])**2)).sum()
+                        reg_loss += ((p-fixed_params[n])**2).sum()
                     loss += self.ewc_lambda * reg_loss * 0.5
                 loss.backward()
                 optimizer.step()

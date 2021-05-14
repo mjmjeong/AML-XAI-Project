@@ -5,6 +5,8 @@ def build_method(args):
         from local_update_set.update_only_fisher import LocalUpdate as LocalUpdateModule
     elif args.local_update == 'ewc':
         from local_update_set.ewc import LocalUpdate as LocalUpdateModule
+    elif args.local_update == 'l2':
+        from local_update_set.l2 import LocalUpdate as LocalUpdateModule
     
     if args.global_update == 'avg':
         from aggregate_utils import average_weights as GlobalUpdate
