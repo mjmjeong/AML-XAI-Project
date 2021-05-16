@@ -65,8 +65,9 @@ def args_parser():
     parser.add_argument('--global_update', type=str, default='avg', help='method for aggregating weights')
     parser.add_argument('--local_update', type=str, default='base', help='method for local update')
     parser.add_argument('--ewc_lambda', type=float, default=0.001, help='weight for ewc loss')
-    parser.add_argument('--fisher_gamma', type=float, default=0, help='the weight for remembering the previous fisher matrix, 0: not considering previous fisher info, [0-1]')
-    parser.add_argument('--fisher_update_type', type=str, default='summation', help='sum fisher matrix the weight')
+    parser.add_argument('--gamma', type=float, help='the weight for remembering the previous fisher matrix, 0: not considering previous fisher info, [0-1]')
+    parser.add_argument('--fisher_update_type', type=str, help='sum fisher matrix the weight',
+                        choices=['gamma', 'summation', 'own'])
     parser.add_argument('--fisher_bs', type=int, default=100, help='batch for fisher iterator')
     args = parser.parse_args()
     return args

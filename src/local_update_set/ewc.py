@@ -114,18 +114,20 @@ class LocalUpdate(object):
                     diag_fisher[n] += (p.grad.detach()**2 / len(self.fisherloader))
         return diag_fisher
     
+   
     def update_fisher(self, model, fisher=None):
         diag_fisher = self.compute_diag_fisher(model)
-        if fisher is None:
+        if fisher is None or self.args.fisher_update_type=='own':
             return diag_fisher
         else:
             for n, p in model.named_parameters():
                 if self.args.fisher_update_type == 'summation':
                     fisher[n] += diag_fisher[n]
-                else:
+                elif self.args.fisher_update_type=='gamma':
                     fisher[n] = (1-self.args.gamma)*diag_fisher[n] + self.args.gamma*fisher[n]  #TODO gamma
             return fisher
     
+
     def inference(self, model):
         """ Returns the inference accuracy and loss.
         """

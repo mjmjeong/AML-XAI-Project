@@ -33,9 +33,11 @@ if __name__ == '__main__':
 
     
     #if args.gpu_id:
+    
     #    torch.cuda.set_device(args.gpu_id)
-    device = 'cuda' if args.gpu else 'cpu'
-
+    #device = 'cuda' if args.gpu else 'cpu'
+    device = 'cuda'
+    print(device)
     #set seed
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -140,12 +142,12 @@ if __name__ == '__main__':
     print("|---- Test Accuracy: {:.2f}%".format(100*test_acc))
 
     # Saving the objects train_loss and train_accuracy:
-    file_name = 'save/objects/{}_{}_{}_C[{}]_iid[{}]_E[{}]_B[{}].pkl'.\
+    file_name = 'save/objects/{}_{}_{}_C{}_iid{}_E{}_B{}_{}_{}_lambda{}.txt'.\
         format(args.dataset, args.model, args.epochs, args.frac, args.iid,
-               args.local_ep, args.local_bs)
+               args.local_ep, args.local_bs,args.local_update, args.global_update,args.ewc_lambda)
 
-    with open(file_name, 'wb') as f:
-        pickle.dump([train_loss, train_accuracy], f)
+    with open(file_name, 'a') as f:
+        print('test_loss {}, train_accuracy {}'.format(test_loss, test_acc), file=f)
 
     print('\n Total Run Time: {0:0.4f}'.format(time.time()-start_time))
 

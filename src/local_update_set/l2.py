@@ -13,7 +13,10 @@ class LocalUpdate(object):
         self.logger = logger
         self.trainloader, self.validloader, self.testloader, self.fisherloader = self.train_val_test(
             dataset, list(idxs))
-        self.device = 'cuda' if args.gpu else 'cpu'
+        
+        
+        #self.device = 'cuda' if args.gpu else 'cpu'
+        self.device = 'cuda' 
         # Default criterion set to NLL loss function
         self.criterion = nn.NLLLoss().to(self.device)
         self.ewc_lambda = args.ewc_lambda
@@ -67,7 +70,7 @@ class LocalUpdate(object):
                     reg_loss = 0 
                     fixed_params = {n:p for n,p in fixed_model.named_parameters()}
                     for n, p in model.named_parameters():
-                        reg_loss += ((p-fixed_params[n])**2).sum()
+                        reg_loss += ((p-fixed_params[n].detach())**2).sum()
                     loss += self.ewc_lambda * reg_loss * 0.5
                 loss.backward()
                 optimizer.step()
@@ -116,13 +119,13 @@ class LocalUpdate(object):
     
     def update_fisher(self, model, fisher=None):
         diag_fisher = self.compute_diag_fisher(model)
-        if fisher is None:
+        if fisher is None or self.args.fisher_update_type=='own':
             return diag_fisher
         else:
             for n, p in model.named_parameters():
                 if self.args.fisher_update_type == 'summation':
                     fisher[n] += diag_fisher[n]
-                else:
+                elif self.args.fisher_update_type=='gamma':
                     fisher[n] = (1-self.args.gamma)*diag_fisher[n] + self.args.gamma*fisher[n]  #TODO gamma
             return fisher
     
