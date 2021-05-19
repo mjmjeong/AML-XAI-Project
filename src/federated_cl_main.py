@@ -102,7 +102,7 @@ if __name__ == '__main__':
             local_model = LocalUpdate(args=args, dataset=train_dataset,
                                       idxs=user_groups[idx], logger=logger)
             w, fisher, loss = local_model.update_weights(
-                model=copy.deepcopy(global_model), fisher=global_fisher, global_round=epoch)
+                model=copy.deepcopy(global_model), fisher=copy.deepcopy(global_fisher), global_round=epoch)
             local_weights.append(copy.deepcopy(w))
             local_losses.append(copy.deepcopy(loss))
             local_fishers.append(copy.deepcopy(fisher))
