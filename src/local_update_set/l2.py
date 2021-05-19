@@ -85,7 +85,6 @@ class LocalUpdate(object):
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
         
         fisher = self.update_fisher(model, fisher)
-        
         return model.state_dict(), fisher, sum(epoch_loss) / len(epoch_loss)
 
     def compute_diag_fisher(self, model):
@@ -108,7 +107,6 @@ class LocalUpdate(object):
             optimizer.zero_grad()
             images, labels = images.to(self.device), labels.to(self.device)
             log_probs = model(images)
-            #batch_size = images.shape[0]
             #TODO true label? estimated label?  
             loss = self.criterion(log_probs, labels)
             loss.backward()
@@ -119,14 +117,22 @@ class LocalUpdate(object):
     
     def update_fisher(self, model, fisher=None):
         diag_fisher = self.compute_diag_fisher(model)
-        if fisher is None or self.args.fisher_update_type=='own':
+        
+        if fisher is None:
+            print('first step for fisher information')
             return diag_fisher
-        else:
+        
+        elif self.args.fisher_update_type=='own':
+            return diag_fisher
+        
+        elif self.args.fisher_update_type == 'summation':
             for n, p in model.named_parameters():
-                if self.args.fisher_update_type == 'summation':
-                    fisher[n] += diag_fisher[n]
-                elif self.args.fisher_update_type=='gamma':
-                    fisher[n] = (1-self.args.gamma)*diag_fisher[n] + self.args.gamma*fisher[n]  #TODO gamma
+                fisher[n] += diag_fisher[n]
+            return fisher
+        
+        elif self.args.fisher_update_type=='gamma':
+            for n, p in model.named_parameters():
+                fisher[n] = (1-self.args.gamma)*diag_fisher[n] + self.args.gamma*fisher[n]  #TODO gamma
             return fisher
     
     def inference(self, model):
