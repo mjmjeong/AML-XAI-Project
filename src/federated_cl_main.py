@@ -36,7 +36,7 @@ if __name__ == '__main__':
     
     #    torch.cuda.set_device(args.gpu_id)
     #device = 'cuda' if args.gpu else 'cpu'
-    device = 'cuda'
+    device = 'cuda:%d' % args.gpu
     print(device)
     #set seed
     random.seed(args.seed)
@@ -66,7 +66,7 @@ if __name__ == '__main__':
         len_in = 1
         for x in img_size:
             len_in *= x
-            global_model = MLP(dim_in=len_in, dim_hidden=64,
+        global_model = MLP(dim_in=len_in, dim_hidden=200,
                                dim_out=args.num_classes)
     else:
         exit('Error: unrecognized model')
