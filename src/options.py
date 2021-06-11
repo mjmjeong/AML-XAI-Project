@@ -69,5 +69,10 @@ def args_parser():
     parser.add_argument('--fisher_update_type', required=True, type=str, help='sum fisher matrix the weight',
                         choices=['gamma', 'summation', 'own'])
     parser.add_argument('--fisher_bs', type=int, default=100, help='batch for fisher iterator')
+
+
+    ## wandb
+    parser.add_argument('--wandb', type=int, default=1, help='turn on wandb logging')
+
     args = parser.parse_args()
     return args

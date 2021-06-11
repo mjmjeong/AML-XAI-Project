@@ -16,7 +16,8 @@ class LocalUpdate(object):
         
         
         #self.device = 'cuda' if args.gpu else 'cpu'
-        self.device = 'cuda' 
+        #self.device = 'cuda'
+        self.device = 'cuda:%d' % args.gpu if args.gpu is not None else 'cpu'
         # Default criterion set to NLL loss function
         self.criterion = nn.NLLLoss().to(self.device)
         self.ewc_lambda = args.ewc_lambda

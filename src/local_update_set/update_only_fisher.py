@@ -13,7 +13,7 @@ class LocalUpdate(object):
         self.logger = logger
         self.trainloader, self.validloader, self.testloader, self.fisherloader = self.train_val_test(
             dataset, list(idxs))
-        self.device = 'cuda' if args.gpu else 'cpu'
+        self.device = 'cuda:%d' % args.gpu if args.gpu is not None else 'cpu'
         # Default criterion set to NLL loss function
         self.criterion = nn.NLLLoss().to(self.device)
         self.ewc_lambda = args.ewc_lambda

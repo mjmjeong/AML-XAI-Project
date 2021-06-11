@@ -34,7 +34,8 @@ def test_inference(args, model, test_dataset):
     loss, total, correct = 0.0, 0.0, 0.0
 
     #device = 'cuda' if args.gpu else 'cpu'
-    device = 'cuda' 
+    #device = 'cuda'
+    device = 'cuda:%d' % args.gpu if args.gpu is not None else 'cpu'
     criterion = nn.NLLLoss().to(device)
     testloader = DataLoader(test_dataset, batch_size=128,
                             shuffle=False)

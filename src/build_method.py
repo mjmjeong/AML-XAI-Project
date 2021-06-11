@@ -13,5 +13,8 @@ def build_method(args):
     elif args.global_update == 'weighted_avg':
         from aggregate_utils import average_weights_with_fisher as GlobalUpdate
 
+    elif args.global_update == 'normalized_weighted_avg':
+        from aggregate_utils import average_weights_with_fisher_normalized as GlobalUpdate
+
     return LocalUpdateModule, GlobalUpdate
     
