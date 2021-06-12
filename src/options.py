@@ -73,6 +73,7 @@ def args_parser():
 
     ## wandb
     parser.add_argument('--wandb', type=int, default=1, help='turn on wandb logging')
+    parser.add_argument('--desc', type=str, help='description for wandb')
 
     args = parser.parse_args()
     return args

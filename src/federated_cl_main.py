@@ -34,7 +34,7 @@ if __name__ == '__main__':
 
     # Wandb Initialization
     if args.wandb:
-        wandb.init(project='AMLXAI_'+args.dataset , notes='../logs')
+        wandb.init(project=args.dataset,entity='amlxai', name=args.desc, notes='../logs')
         wandb.config.update(args)
 
     
