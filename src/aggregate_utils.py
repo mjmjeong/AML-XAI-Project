@@ -39,6 +39,7 @@ def layer_normalize(w):
 
 
 def normalize(w):
+    eps = 1e-8
     w_sum = {}
     for key in w[0].keys():
         w_sum[key] = 0.
@@ -46,7 +47,7 @@ def normalize(w):
             #w[i][key] = layer_normalize(w[i][key])
             w_sum[key] += w[i][key]
         for i in range(0, len(w)):
-            w[i][key] /= w_sum[key]
+            w[i][key] /= (w_sum[key] + eps)
     return w
 
 def average_weights_with_fisher(w, local_fisher):
@@ -60,6 +61,7 @@ def average_weights_with_fisher(w, local_fisher):
 
 
 def normalize_with_layer_norm(w):
+    eps = 1e-8
     w_sum = {}
     for key in w[0].keys():
         w_sum[key] = 0.
@@ -67,7 +69,7 @@ def normalize_with_layer_norm(w):
             w[i][key] = layer_normalize(w[i][key])
             w_sum[key] += w[i][key]
         for i in range(0, len(w)):
-            w[i][key] /= w_sum[key]
+            w[i][key] /= (w_sum[key] + eps)
     return w
 
 def average_weights_with_fisher_normalized(w, local_fisher):
@@ -79,5 +81,10 @@ def average_weights_with_fisher_normalized(w, local_fisher):
             w_avg[key] += w[i][key]*local_fisher[i][key]
     return w_avg
 
-
-
+def check_mean_std(model):
+    mean = {}
+    std = {}
+    for name, params in model.items():
+        mean[name] = torch.mean(params)
+        std[name] = torch.std(params)
+    return mean, std
