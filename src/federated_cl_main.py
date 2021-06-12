@@ -21,6 +21,7 @@ from aggregate_utils import average_weights
 
 import random
 import numpy as np
+import wandb
 if __name__ == '__main__':
     start_time = time.time()
 
@@ -30,6 +31,11 @@ if __name__ == '__main__':
 
     args = args_parser()
     exp_details(args)
+
+    # Wandb Initialization
+    if args.wandb:
+        wandb.init(project='AMLXAI_'+args.dataset , notes='../logs')
+        wandb.config.update(args)
 
     
     #if args.gpu_id:
@@ -75,6 +81,8 @@ if __name__ == '__main__':
     global_model.to(device)
     global_model.train()
     print(global_model)
+    if args.wandb:
+        wandb.watch(global_model)
 
     # copy weights
     global_weights = global_model.state_dict()
@@ -85,7 +93,7 @@ if __name__ == '__main__':
     train_loss, train_accuracy = [], []
     val_acc_list, net_list = [], []
     cv_loss, cv_acc = [], []
-    print_every = 2
+    print_every = 1
     val_loss_pre, counter = 0, 0
 
     global_fisher = None
@@ -134,6 +142,27 @@ if __name__ == '__main__':
             print(f'Training Loss : {np.mean(np.array(train_loss))}')
             print('Train Accuracy: {:.2f}% \n'.format(100*train_accuracy[-1]))
 
+            # Test inference after completion of training
+            test_acc, test_loss = test_inference(args, global_model, test_dataset)
+
+            print(f' \n Results after {args.epochs} global rounds of training:')
+            print("|---- Avg Train Accuracy: {:.2f}%".format(100 * train_accuracy[-1]))
+            print("|---- Test Accuracy: {:.2f}%".format(100 * test_acc))
+
+            wandb.log({
+                'Avg Train Acc' : 100 * train_accuracy[-1],
+                'Test Acc' : 100 * test_acc
+            })
+
+            # Saving the objects train_loss and train_accuracy:
+            file_name = 'save/objects/{}_{}_{}_C{}_iid{}_E{}_B{}_{}_{}_lambda{}_progress.txt'. \
+                format(args.dataset, args.model, args.epochs, args.frac, args.iid,
+                       args.local_ep, args.local_bs, args.local_update, args.global_update, args.ewc_lambda)
+
+            with open(file_name, 'a') as f:
+                print('epoch {}, test_loss {}, train_accuracy {}'.format((epoch+1), test_loss, test_acc), file=f)
+
+            print('\n Total Run Time: {0:0.4f}'.format(time.time() - start_time))
     # Test inference after completion of training
     test_acc, test_loss = test_inference(args, global_model, test_dataset)
 
