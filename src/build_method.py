@@ -5,6 +5,8 @@ def build_method(args):
         from local_update_set.update_only_fisher import LocalUpdate as LocalUpdateModule
     elif args.local_update == 'ewc':
         from local_update_set.ewc import LocalUpdate as LocalUpdateModule
+    elif args.local_update == 'rwalk':
+        from local_update_set.rwalk import LocalUpdate as LocalUpdateModule
     elif args.local_update == 'l2':
         from local_update_set.l2 import LocalUpdate as LocalUpdateModule
     
