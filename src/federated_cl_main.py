@@ -56,7 +56,8 @@ if __name__ == '__main__':
     # load dataset and user groups
     train_dataset, test_dataset, user_groups = get_dataset(args)
 
-    # BUILD MODEL
+    #with torch.autograd.set_detect_anomaly(True):
+#ILD MODEL
     if args.model == 'cnn':
         # Convolutional neural netork
         if args.dataset == 'mnist':
@@ -97,9 +98,12 @@ if __name__ == '__main__':
     val_loss_pre, counter = 0, 0
 
     global_fisher = None
+    global_scores = None
     for epoch in tqdm(range(args.epochs)):
         local_weights, local_losses = [], []
         local_fishers = []
+        local_scores = []
+        local_fishers_scores = []
         print(f'\n | Global Training Round : {epoch+1} |\n')
 
         global_model.train()
@@ -109,15 +113,24 @@ if __name__ == '__main__':
         for idx in idxs_users:
             local_model = LocalUpdate(args=args, dataset=train_dataset,
                                       idxs=user_groups[idx], logger=logger)
-            w, fisher, loss = local_model.update_weights(
-                model=copy.deepcopy(global_model), fisher=copy.deepcopy(global_fisher), global_round=epoch)
+            w, fisher, score, loss = local_model.update_weights(
+                model=copy.deepcopy(global_model), fisher=copy.deepcopy(global_fisher), 
+                score=copy.deepcopy(global_scores),
+                global_round=epoch)
             local_weights.append(copy.deepcopy(w))
             local_losses.append(copy.deepcopy(loss))
             local_fishers.append(copy.deepcopy(fisher))
+            local_scores.append(copy.deepcopy(score))
         # update global weights
         
+        local_fishers_scores = copy.deepcopy(local_scores)
+        for i in range(len(local_fishers)):
+            for k, v in local_fishers[i].items(): 
+                local_fishers_scores[i][k] = local_fishers[i][k] +local_scores[i][k]
         global_fisher = average_weights(local_fishers)
-        global_weights = GlobalUpdate(local_weights, local_fishers)
+        global_scores = average_weights(local_scores)
+        global_fishers_scores = average_weights(local_fishers_scores)
+        global_weights = GlobalUpdate(local_weights, local_fishers_scores)
 
         # update global weights
         global_model.load_state_dict(global_weights)
@@ -148,11 +161,11 @@ if __name__ == '__main__':
             print(f' \n Results after {args.epochs} global rounds of training:')
             print("|---- Avg Train Accuracy: {:.2f}%".format(100 * train_accuracy[-1]))
             print("|---- Test Accuracy: {:.2f}%".format(100 * test_acc))
-
-            wandb.log({
+            if args.wandb:
+                wandb.log({
                 'Avg Train Acc' : 100 * train_accuracy[-1],
                 'Test Acc' : 100 * test_acc
-            })
+                })
 
             # Saving the objects train_loss and train_accuracy:
             file_name = 'save/objects/{}_{}_{}_C{}_iid{}_E{}_B{}_{}_{}_lambda{}_progress.txt'. \
@@ -180,27 +193,27 @@ if __name__ == '__main__':
 
     print('\n Total Run Time: {0:0.4f}'.format(time.time()-start_time))
 
-    # PLOTTING (optional)
-    # import matplotlib
-    # import matplotlib.pyplot as plt
-    # matplotlib.use('Agg')
-
-    # Plot Loss curve
-    # plt.figure()
-    # plt.title('Training Loss vs Communication rounds')
-    # plt.plot(range(len(train_loss)), train_loss, color='r')
-    # plt.ylabel('Training loss')
-    # plt.xlabel('Communication Rounds')
-    # plt.savefig('../save/fed_{}_{}_{}_C[{}]_iid[{}]_E[{}]_B[{}]_loss.png'.
-    #             format(args.dataset, args.model, args.epochs, args.frac,
-    #                    args.iid, args.local_ep, args.local_bs))
-    #
-    # # Plot Average Accuracy vs Communication rounds
-    # plt.figure()
-    # plt.title('Average Accuracy vs Communication rounds')
-    # plt.plot(range(len(train_accuracy)), train_accuracy, color='k')
-    # plt.ylabel('Average Accuracy')
-    # plt.xlabel('Communication Rounds')
-    # plt.savefig('../save/fed_{}_{}_{}_C[{}]_iid[{}]_E[{}]_B[{}]_acc.png'.
-    #             format(args.dataset, args.model, args.epochs, args.frac,
-    #                    args.iid, args.local_ep, args.local_bs))
+        # PLOTTING (optional)
+        # import matplotlib
+        # import matplotlib.pyplot as plt
+        # matplotlib.use('Agg')
+    
+        # Plot Loss curve
+        # plt.figure()
+        # plt.title('Training Loss vs Communication rounds')
+        # plt.plot(range(len(train_loss)), train_loss, color='r')
+        # plt.ylabel('Training loss')
+        # plt.xlabel('Communication Rounds')
+        # plt.savefig('../save/fed_{}_{}_{}_C[{}]_iid[{}]_E[{}]_B[{}]_loss.png'.
+        #             format(args.dataset, args.model, args.epochs, args.frac,
+        #                    args.iid, args.local_ep, args.local_bs))
+        #
+        # # Plot Average Accuracy vs Communication rounds
+        # plt.figure()
+        # plt.title('Average Accuracy vs Communication rounds')
+        # plt.plot(range(len(train_accuracy)), train_accuracy, color='k')
+        # plt.ylabel('Average Accuracy')
+        # plt.xlabel('Communication Rounds')
+        # plt.savefig('../save/fed_{}_{}_{}_C[{}]_iid[{}]_E[{}]_B[{}]_acc.png'.
+        #             format(args.dataset, args.model, args.epochs, args.frac,
+        #                    args.iid, args.local_ep, args.local_bs))

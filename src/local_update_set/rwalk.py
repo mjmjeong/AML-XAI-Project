@@ -40,7 +40,7 @@ class LocalUpdate(object):
                                 batch_size=int(len(idxs_test)/10), shuffle=False)
         return trainloader, validloader, testloader, fisherloader
 
-    def update_weights(self, model, fisher, global_round):
+    def update_weights(self, model, fisher,score,global_round):
         # Set mode to train model
         fixed_model = copy.deepcopy(model) 
         fixed_params = {n:p for n,p in fixed_model.named_parameters()}
@@ -76,7 +76,7 @@ class LocalUpdate(object):
                     reg_loss = 0 
                     for n, p in model.named_parameters():
                         #reg_loss += ((fisher[n]+information[n])*((p-fixed_params[n])**2)).sum()
-                        reg_loss += (fisher[n]*((p-fixed_params[n])**2)).sum()
+                        reg_loss +=( (fisher[n]+score[n])*((p-fixed_params[n])**2)).sum()
                     loss += self.ewc_lambda * reg_loss * 0.5
                 loss.backward()
                 optimizer.step()
@@ -89,9 +89,9 @@ class LocalUpdate(object):
                 batch_loss.append(loss.item())
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
         
-        fisher = self.update_fisher(model, fixed_model, fisher)
+        fisher, score = self.update_fisher(model, fixed_model, fisher, score)
         
-        return model.state_dict(), fisher, sum(epoch_loss) / len(epoch_loss)
+        return model.state_dict(), fisher, score,  sum(epoch_loss) / len(epoch_loss)
 
     def compute_diag_fisher(self, model, fixed_model):
        
@@ -112,6 +112,7 @@ class LocalUpdate(object):
         
         fixed_params = {n:p for n,p in fixed_model.named_parameters()}
         previous_params = fixed_params
+        previous_model = fixed_model
         #diagonal fisher matrix
         for i, (images, labels) in enumerate(self.fisherloader):
             optimizer.zero_grad()
@@ -123,39 +124,53 @@ class LocalUpdate(object):
             loss = self.criterion(log_probs, labels)
             loss.backward()
             
-            fixed_log_probs = fixed_model(images)
+            fixed_log_probs = previous_model(images)
             fixed_loss = self.criterion(fixed_log_probs, labels)
             fixed_loss.backward()
+            previous_params = {n:p for n,p in previous_model.named_parameters()}
             delta_loss = loss-fixed_loss
             for n, p in model.named_parameters():
                 if p.grad is not None:
                     diag_fisher[n] += (p.grad.detach()**2 / len(self.fisherloader))
             for n, p in model.named_parameters():
                 eps = 1e-5
-                if p.grad is not None:
-                    #batch_score_info = delta_loss/(0.5*diag_fisher[n]*(p-fixed_params[n])**2+eps)
-                    #batch_score_info =(p.grad -fixed_params[n].grad)/(0.5*diag_fisher[n]*(p-fixed_params[n])**2+1e-1)
-                    batch_score_info =p.grad*(p-previous_params[n])/(0.5*diag_fisher[n]*(p-fixed_params[n])**2+eps)
-                    #batch_score_info =p.grad*(p-previous_params[n])/(0.5*(p-fixed_params[n])**2+eps)
-                    score_information[n] += batch_score_info.detach()/len(self.fisherloader)
+                if p.grad is not None and fixed_params[n].grad is not None:
+                    #batch_score_info = -delta_loss/(0.5*diag_fisher[n]*(p-fixed_params[n])**2+eps)
+                    #batch_score_info = 1*(p.grad -previous_params[n].grad)/(0.5*(p-fixed_params[n])**2*diag_fisher[n]+eps)
+                    batch_score_info =-p.grad*(p-previous_params[n])/(0.5*diag_fisher[n]*(p-fixed_params[n])**2+eps)
+                    
+                    #batch_score_info =-p.grad*(p-previous_params[n])/(0.5*(p-fixed_params[n])**2+eps)
+                    
+                    batch_score_info=nn.functional.relu(batch_score_info.detach())/len(self.fisherloader)
+                    if batch_score_info.dim() != 1:
+                        max_value,_ = torch.max(batch_score_info, dim=1, keepdim=True)
+                        min_value,_ = torch.min(batch_score_info,dim=1,keepdim=True)
+                        batch_score_info = (batch_score_info-min_value)/(max_value-min_value+1e-10)
+                    score_information[n] += 5e-5*batch_score_info/len(self.fisherloader)
+                    print(score_information[n].sum())
             previous_params = {n:p.detach() for n,p in model.named_parameters()}
+            previous_model = model
         return diag_fisher, score_information
     
    
-    def update_fisher(self, model, fixed_model, fisher=None):
+    def update_fisher(self, model, fixed_model, fisher=None, score=None):
         diag_fisher, score_information = self.compute_diag_fisher(model, fixed_model)
         
         if fisher is None:
             print('first step for fisher information')
-            return diag_fisher
+            return diag_fisher, score_information
         
         elif self.args.fisher_update_type=='own':
             return diag_fisher
         
         elif self.args.fisher_update_type == 'summation':
             for n, p in model.named_parameters():
-                fisher[n] += diag_fisher[n] + score_information[n]
-            return fisher 
+                fisher[n] += diag_fisher[n] 
+                #score_information[n] = 0.5*(score[n] + score_information[n])
+                score_information[n] = score_information[n].detach()
+                #score_information[n] = score[n]+score_information[n].detach()
+                #+ score_information[n]
+            return fisher, score_information
         
         elif self.args.fisher_update_type=='gamma':
             for n, p in model.named_parameters():
@@ -163,6 +178,11 @@ class LocalUpdate(object):
                 fisher[n] = fisher[n].detach()
             return fisher 
  
+        elif self.args.fisher_update_type=='score':
+            for n, p in model.named_parameters():
+                fisher[n] = score_information[n]#TODO gamma
+                fisher[n] = fisher[n].detach()
+            return fisher 
     def inference(self, model):
         """ Returns the inference accuracy and loss.
         """
