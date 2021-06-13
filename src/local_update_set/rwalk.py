@@ -133,11 +133,11 @@ class LocalUpdate(object):
             for n, p in model.named_parameters():
                 eps = 1e-5
                 if p.grad is not None:
-                    #batch_score_info = delta_loss/(0.5*diag_fisher[n]*(p-fixed_params[n])**2+eps)
-                    #batch_score_info =(p.grad -fixed_params[n].grad)/(0.5*diag_fisher[n]*(p-fixed_params[n])**2+1e-1)
-                    batch_score_info =p.grad*(p-previous_params[n])/(0.5*diag_fisher[n]*(p-fixed_params[n])**2+eps)
-                    #batch_score_info =p.grad*(p-previous_params[n])/(0.5*(p-fixed_params[n])**2+eps)
-                    score_information[n] += batch_score_info.detach()/len(self.fisherloader)
+                    #batch_score_info = -delta_loss/(0.5*diag_fisher[n]*(p-fixed_params[n])**2+eps)
+                    #batch_score_info =-1*(p.grad -fixed_params[n].grad)/(0.5*diag_fisher[n]*(p-fixed_params[n])**2+1e-1)
+                    batch_score_info =-p.grad*(p-previous_params[n])/(0.5*diag_fisher[n]*(p-fixed_params[n])**2+eps)
+                    #batch_score_info =-p.grad*(p-previous_params[n])/(0.5*(p-fixed_params[n])**2+eps)
+                    score_information[n] += nn.functional.relu(batch_score_info.detach()/len(self.fisherloader))
             previous_params = {n:p.detach() for n,p in model.named_parameters()}
         return diag_fisher, score_information
     
