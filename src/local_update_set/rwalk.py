@@ -112,6 +112,7 @@ class LocalUpdate(object):
         
         fixed_params = {n:p for n,p in fixed_model.named_parameters()}
         previous_params = fixed_params
+        previous_model = fixed_model
         #diagonal fisher matrix
         for i, (images, labels) in enumerate(self.fisherloader):
             optimizer.zero_grad()
@@ -123,9 +124,11 @@ class LocalUpdate(object):
             loss = self.criterion(log_probs, labels)
             loss.backward()
             
-            fixed_log_probs = fixed_model(images)
+            #optimizer.step()
+            fixed_log_probs = previous_model(images)
             fixed_loss = self.criterion(fixed_log_probs, labels)
             fixed_loss.backward()
+            previous_params = {n:p for n,p in previous_model.named_parameters()}
             delta_loss = loss-fixed_loss
             for n, p in model.named_parameters():
                 if p.grad is not None:
@@ -138,7 +141,8 @@ class LocalUpdate(object):
                     batch_score_info =-p.grad*(p-previous_params[n])/(0.5*diag_fisher[n]*(p-fixed_params[n])**2+eps)
                     #batch_score_info =-p.grad*(p-previous_params[n])/(0.5*(p-fixed_params[n])**2+eps)
                     score_information[n] += nn.functional.relu(batch_score_info.detach()/len(self.fisherloader))
-            previous_params = {n:p.detach() for n,p in model.named_parameters()}
+            #previous_params = {n:p.detach() for n,p in model.named_parameters()}
+            previous_model = model
         return diag_fisher, score_information
     
    
