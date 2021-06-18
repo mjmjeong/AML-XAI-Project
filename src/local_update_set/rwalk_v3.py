@@ -46,6 +46,7 @@ class LocalUpdate(object):
         fixed_params = {n:p for n,p in fixed_model.named_parameters()}
         model.train()
         epoch_loss = []
+        eps = 1e-5
 
         # Set optimizer for the local updates
         if self.args.optimizer == 'sgd':
@@ -54,7 +55,7 @@ class LocalUpdate(object):
         elif self.args.optimizer == 'adam':
             optimizer = torch.optim.Adam(model.parameters(), lr=self.args.lr,
                                          weight_decay=1e-4)
-
+        pre_model=copy.deepcopy(model)
         for iter in range(self.args.local_ep):
             batch_loss = []
             for batch_idx, (images, labels) in enumerate(self.trainloader):
@@ -64,15 +65,9 @@ class LocalUpdate(object):
                 log_probs = model(images)
                 loss = self.criterion(log_probs, labels)
                 
-                fixed_log_probs = fixed_model(images)
-                fixed_loss = self.criterion(fixed_log_probs, labels)
-                delta_loss = loss-fixed_loss
-
-                #EWC loss
-                #information = {}
+                #loss.backward(retain_graph=True)
+                                #LOSS TERM
                 if not global_round == 0: #TODO first step! -> Not using fisher info
-                #    for n, p in model.named_parameters():
-                #        information[n] = nn.functional.relu(delta_loss/(0.5*fisher[n]*(p-fixed_params[n])**2+1e-10))
                     reg_loss = 0 
                     for n, p in model.named_parameters():
                         #reg_loss += ((fisher[n]+information[n])*((p-fixed_params[n])**2)).sum()
@@ -80,6 +75,18 @@ class LocalUpdate(object):
                     loss += self.ewc_lambda * reg_loss * 0.5
                 loss.backward()
                 optimizer.step()
+                
+                #SI
+                information = {}
+                for n, p in model.named_parameters():
+                    information[n] = torch.zeros_like(p)
+                if global_round >1: #TODO first step! -> Not using fisher info
+                    previous_params = {n:p for n,p in pre_model.named_parameters()}
+                    for n, p in model.named_parameters():
+                        if p.grad is not None:
+                            batch_score_info =-p.grad*(p-previous_params[n])/(0.5*fisher[n]*(p-fixed_params[n])**2+eps)
+                            information[n] += nn.functional.relu(batch_score_info.detach()/len(self.fisherloader))
+                
                 if self.args.verbose and (batch_idx % 10 == 0):
                     print('| Global Round : {} | Local Epoch : {} | [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                         global_round, iter, batch_idx * len(images),
@@ -87,11 +94,12 @@ class LocalUpdate(object):
                         100. * batch_idx / len(self.trainloader), loss.item()))
                 self.logger.add_scalar('loss', loss.item())
                 batch_loss.append(loss.item())
+                #pre_model = copy.deepcopy(model)
             epoch_loss.append(sum(batch_loss)/len(batch_loss))
         
-        fisher, score = self.update_fisher(model, fixed_model, fisher, score)
+        fisher  = self.update_fisher(model, fixed_model, fisher, score)
         
-        return model.state_dict(), fisher, score,  sum(epoch_loss) / len(epoch_loss)
+        return model.state_dict(), fisher, information,  sum(epoch_loss) / len(epoch_loss)
 
     def compute_diag_fisher(self, model, fixed_model):
        
@@ -111,8 +119,6 @@ class LocalUpdate(object):
             score_information[n] = p.clone().detach().fill_(0)
         
         fixed_params = {n:p for n,p in fixed_model.named_parameters()}
-        previous_params = fixed_params
-        previous_model = fixed_model
         #diagonal fisher matrix
         for i, (images, labels) in enumerate(self.fisherloader):
             optimizer.zero_grad()
@@ -124,41 +130,35 @@ class LocalUpdate(object):
             loss = self.criterion(log_probs, labels)
             loss.backward()
             
-            fixed_log_probs = previous_model(images)
-            fixed_loss = self.criterion(fixed_log_probs, labels)
-            fixed_loss.backward()
-            previous_params = {n:p for n,p in previous_model.named_parameters()}
-            delta_loss = loss-fixed_loss
+            #fixed_log_probs = previous_model(images)
+            #fixed_loss = self.criterion(fixed_log_probs, labels)
+            #fixed_loss.backward()
+            #delta_loss = loss-fixed_loss
             for n, p in model.named_parameters():
                 if p.grad is not None:
                     diag_fisher[n] += (p.grad.detach()**2 / len(self.fisherloader))
-            for n, p in model.named_parameters():
-                eps = 1e-5
-                if p.grad is not None and fixed_params[n].grad is not None:
-                    #batch_score_info = -delta_loss/(0.5*diag_fisher[n]*(p-fixed_params[n])**2+eps)
-                    #batch_score_info = 1*(p.grad -previous_params[n].grad)/(0.5*(p-fixed_params[n])**2*diag_fisher[n]+eps)
-                    batch_score_info =-p.grad*(p-previous_params[n])/(0.5*diag_fisher[n]*(p-fixed_params[n])**2+eps)
-                    
-                    #batch_score_info =-p.grad*(p-previous_params[n])/(0.5*(p-fixed_params[n])**2+eps)
-                    
-                    batch_score_info=nn.functional.relu(batch_score_info.detach())/len(self.fisherloader)
-                    if batch_score_info.dim() != 1:
-                        max_value,_ = torch.max(batch_score_info, dim=1, keepdim=True)
-                        min_value,_ = torch.min(batch_score_info,dim=1,keepdim=True)
-                        batch_score_info = (batch_score_info-min_value)/(max_value-min_value+1e-10)
-                    score_information[n] += 5e-5*batch_score_info/len(self.fisherloader)
-                    print(score_information[n].sum())
-            previous_params = {n:p.detach() for n,p in model.named_parameters()}
-            previous_model = model
-        return diag_fisher, score_information
+#            for n, p in model.named_parameters():
+#                eps = 1e-5
+#                if p.grad is not None:
+#                    if batch_score_info.dim() != 1:
+#                        max_value,_ = torch.max(batch_score_info, dim=1, keepdim=True)
+#                        min_value,_ = torch.min(batch_score_info,dim=1,keepdim=True)
+#                        batch_score_info = (batch_score_info-min_value)/(max_value-min_value+1e-10)
+#                    score_information[n] += 5e-5*batch_score_info/len(self.fisherloader)
+#                    print(score_information[n].sum())
+#            previous_params = {n:p.detach() for n,p in model.named_parameters()}
+#            previous_model = model
+        return diag_fisher
+    #score_information
     
    
     def update_fisher(self, model, fixed_model, fisher=None, score=None):
-        diag_fisher, score_information = self.compute_diag_fisher(model, fixed_model)
+        diag_fisher  = self.compute_diag_fisher(model, fixed_model)
         
         if fisher is None:
             print('first step for fisher information')
-            return diag_fisher, score_information
+            return diag_fisher
+        #score_information
         
         elif self.args.fisher_update_type=='own':
             return diag_fisher
@@ -168,9 +168,10 @@ class LocalUpdate(object):
                 fisher[n] += diag_fisher[n] 
                 #score_information[n] = 0.5*(score[n] + score_information[n])
                 #score_information[n] = score_information[n].detach()
-                score_information[n] = score[n]+score_information[n].detach()
+                #score_information[n] = score[n]+score_information[n].detach()
                 #+ score_information[n]
-            return fisher, score_information
+            return fisher
+        #, score_information
         
         elif self.args.fisher_update_type=='gamma':
             for n, p in model.named_parameters():

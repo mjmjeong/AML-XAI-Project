@@ -126,7 +126,10 @@ if __name__ == '__main__':
         local_fishers_scores = copy.deepcopy(local_scores)
         for i in range(len(local_fishers)):
             for k, v in local_fishers[i].items(): 
-                local_fishers_scores[i][k] = local_fishers[i][k] +local_scores[i][k]
+                if epoch==0:
+                    local_fishers_scores[i][k] = local_fishers[i][k] 
+                else:
+                    local_fishers_scores[i][k] = local_fishers[i][k] +local_scores[i][k]
         global_fisher = average_weights(local_fishers)
         global_scores = average_weights(local_scores)
         global_fishers_scores = average_weights(local_fishers_scores)

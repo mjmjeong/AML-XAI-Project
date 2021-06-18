@@ -7,6 +7,10 @@ def build_method(args):
         from local_update_set.ewc import LocalUpdate as LocalUpdateModule
     elif args.local_update == 'rwalk':
         from local_update_set.rwalk import LocalUpdate as LocalUpdateModule
+    elif args.local_update == 'rwalk_v2':
+        from local_update_set.rwalk_v2 import LocalUpdate as LocalUpdateModule
+    elif args.local_update == 'rwalk_v3':
+        from local_update_set.rwalk_v3 import LocalUpdate as LocalUpdateModule
     elif args.local_update == 'l2':
         from local_update_set.l2 import LocalUpdate as LocalUpdateModule
     
