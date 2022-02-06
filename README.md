@@ -1,9 +1,12 @@
-# Overcoming Forgetting in Federated Learning via Importance From Agent (AML-XAI-Project)
+# Overcoming Forgetting in Federated Learning via Importance From Agent (AML-XAI-Project) [[paper]](report.pdf)
 
 ## Federated-Learning (PyTorch)
 This implementation is highly borrowed from https://github.com/AshwinRJ/Federated-Learning-PyTorch
-We conducted this research for the final project of 'Adaptive Machine Learning and Explainable AI' class in Seoul National University by Prof. Taesup Moon.
 
+We conducted this research for the final project of 'Adaptive Machine Learning and Explainable AI' class in Seoul National University by Prof. [Taesup Moon](https://mindlab-snu.github.io/people/pi/).
+Please refer to our [report](report.pdf) for the detail of the proposed algorithm.
+
+<img src="framework.png" width="600">
 
 Experiments are produced on MNIST, Fashion MNIST and CIFAR10 (both IID and non-IID). In case of non-IID, the data amongst the users can be split equally or unequally.
 Since the purpose of these experiments are to illustrate the effectiveness of the federated learning paradigm, only simple models such as MLP and CNN are used.
